@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Holy Quran</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Amiri&family=Noto+Nastaliq+Urdu:wght@400;600&family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+<link rel="manifest" href="manifest.json">
+
+<style>
+body{background:#020617;font-family:Poppins,sans-serif;color:#e5e7eb}
+
+/* UI SAME */
+.arabic{font-family:'Amiri',serif;direction:rtl;text-align:justify;text-align-last:center;font-size:1.85rem;line-height:3rem;color:#f0fdf4;word-spacing:.12em}
+.urdu{font-family:'Noto Nastaliq Urdu',serif;direction:rtl;text-align:center;font-size:1.05rem;line-height:2.2rem;margin-top:18px;color:#cbd5e1}
+.ayah{position:relative;padding:40px 30px 34px;margin-bottom:36px;border-radius:26px;opacity:.35;transition:.35s}
+.ayah.active{opacity:1;background:radial-gradient(circle at top,#064e3b,#020617);box-shadow:0 0 50px rgba(16,185,129,.25)}
+.ayah-num{position:absolute;top:18px;right:20px;width:38px;height:38px;border-radius:50%;background:#064e3b;color:#ecfdf5;display:flex;align-items:center;justify-content:center;font-family:'Amiri',serif}
+.card{background:#020617;border:1px solid #064e3b}
+.card:hover{background:#022c22}
+.hidden{display:none}
+
+/* MODAL */
+.modal-bg{
+ position:fixed;
+ inset:0;
+ background:rgba(0,0,0,.7);
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ z-index:50
+}
+.modal{
+ position:relative;
+ background:#020617;
+ border:1px solid #064e3b;
+ border-radius:18px;
+ padding:22px;
+ width:300px
+}
+.modal h3{color:#34d399;margin-bottom:6px}
+.modal p{color:#cbd5e1;font-size:.9rem;margin-bottom:16px}
+.modal button{width:100%;padding:10px;border-radius:10px}
+
+/* CLOSE BUTTON */
+.modal-close{
+ position:absolute;
+ top:10px;
+ right:12px;
+ width:30px;
+ height:30px;
+ border-radius:50%;
+ background:#022c22;
+ color:#e5e7eb;
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ cursor:pointer;
+ font-size:1.2rem;
+ line-height:1;
+}
+.modal-close:hover{background:#064e3b}
+</style>
+</head>
+
+<body>
+
+<div class="max-w-3xl mx-auto p-6">
+
+<h1 class="arabic text-5xl text-emerald-400 text-center mb-6">القرآن الكريم</h1>
+
+<select id="reciter" class="w-full mb-3 p-3 rounded-xl bg-slate-900">
+<option value="">Select Qari</option>
+<option value="Alafasy_128kbps">Mishary Al-Afasy</option>
+<option value="Abdurrahmaan_As-Sudais_64kbps">Abdul Rahman Al-Sudais</option>
+<option value="Abdul_Basit_Murattal_64kbps">Abdul Basit</option>
+<option value="Muhammad_Jibreel_64kbps">Muhammad Jibreel</option>
+<option value="Abdullah_Basfar_64kbps">Abdullah Basfar</option>
+<option value="Muhammad_Ayyoub_64kbps">Muhammad Ayyoub</option>
+<option value="Fares_Abbad_64kbps">Fares Abbad</option>
+</select>
+
+<button id="backBtn" onclick="goBack()" class="hidden mb-4 px-5 py-2 bg-emerald-700 rounded-xl shadow">
+← Back to Surah List
+</button>
+
+<div id="surahList">Loading…</div>
+<div id="ayahs" class="hidden"></div>
+
+</div>
+
+<!-- AUDIO -->
+<audio id="player" preload="auto"></audio>
+<audio id="preload1"></audio>
+<audio id="preload2"></audio>
+<audio id="preload3"></audio>
+<audio id="preload4"></audio>
+<audio id="preload5"></audio>
+<audio id="preload6"></audio>
+<audio id="preload7"></audio>
+<audio id="preload8"></audio>
+<audio id="preload9"></audio>
+<audio id="preload10"></audio>
+
+<!-- MODAL -->
+<div id="qariModal" class="hidden modal-bg">
+ <div class="modal">
+  <!-- ✕ CLOSE -->
+  <div class="modal-close" onclick="closeQariModal()">✕</div>
+
+  <h3>Change Qari</h3>
+  <p>How do you want to continue?</p>
+
+  <button onclick="startFromBeginning()" class="bg-emerald-600 mb-2">
+   Start from Beginning
+  </button>
+  <button onclick="continueFromCurrent()" class="bg-slate-700">
+   Continue Current Ayah
+  </button>
+ </div>
+</div>
+
+<script>
+const surahList=document.getElementById("surahList");
+const ayahsDiv=document.getElementById("ayahs");
+const player=document.getElementById("player");
+const backBtn=document.getElementById("backBtn");
+const reciterEl=document.getElementById("reciter");
+const modal=document.getElementById("qariModal");
+const preloadEls=[...Array(10)].map((_,i)=>document.getElementById("preload"+(i+1)));
+const pad=n=>String(n).padStart(3,"0");
+
+let audioUrls=[], index=0;
+let currentSurah=0, pendingReciter=null;
+
+/* LOAD SURAH LIST */
+(async()=>{
+ const r=await fetch("https://api.alquran.cloud/v1/surah");
+ const d=await r.json();
+ surahList.innerHTML=d.data.map(s=>`
+  <div class="card p-4 mb-3 rounded-xl cursor-pointer"
+   onclick="openSurah(${s.number})">
+   ${s.englishName} (${s.numberOfAyahs})
+  </div>`).join("");
+})();
+
+/* OPEN SURAH */
+async function openSurah(id, keepIndex=false){
+ const rec=pendingReciter || reciterEl.value;
+ if(!rec){alert("Select Qari first");return}
+
+ currentSurah=id;
+ pendingReciter=null;
+
+ surahList.classList.add("hidden");
+ ayahsDiv.classList.remove("hidden");
+ backBtn.classList.remove("hidden");
+ ayahsDiv.innerHTML="Loading…";
+
+ const [ar,ur]=await Promise.all([
+  fetch(`https://api.alquran.cloud/v1/surah/${id}`),
+  fetch(`https://api.alquran.cloud/v1/surah/${id}/ur.jalandhry`)
+ ]);
+
+ const arD=await ar.json();
+ const urD=await ur.json();
+
+ audioUrls=arD.data.ayahs.map(a=>
+  `https://everyayah.com/data/${rec}/${pad(id)}${pad(a.numberInSurah)}.mp3`
+ );
+
+ ayahsDiv.innerHTML=arD.data.ayahs.map((a,i)=>`
+  <div class="ayah" id="a${i}">
+   <div class="ayah-num">${a.numberInSurah}</div>
+   <div class="arabic">${a.text}</div>
+   <div class="urdu">${urD.data.ayahs[i].text}</div>
+  </div>
+ `).join("");
+
+ if(!keepIndex) index=0;
+ playAyah(index);
+}
+
+/* PLAY + PRELOAD 10 */
+function playAyah(i){
+ if(i>=audioUrls.length) return;
+ index=i;
+
+ document.querySelectorAll(".ayah").forEach(x=>x.classList.remove("active"));
+ const el=document.getElementById("a"+i);
+ if(el){
+  el.classList.add("active");
+  el.scrollIntoView({behavior:"smooth",block:"center"});
+ }
+
+ player.src=audioUrls[i];
+ player.play();
+
+ preloadEls.forEach((el,n)=>{
+  if(audioUrls[i+n+1]){el.src=audioUrls[i+n+1];el.load()}
+ });
+
+ player.onended=()=>playAyah(i+1);
+}
+
+/* BACK */
+function goBack(){
+ ayahsDiv.classList.add("hidden");
+ surahList.classList.remove("hidden");
+ backBtn.classList.add("hidden");
+}
+
+/* QARI CHANGE */
+reciterEl.onchange=()=>{
+ if(!currentSurah) return;
+ pendingReciter=reciterEl.value;
+ modal.classList.remove("hidden");
+};
+
+/* MODAL ACTIONS */
+function closeQariModal(){
+ modal.classList.add("hidden");
+ pendingReciter=null;
+}
+function startFromBeginning(){
+ modal.classList.add("hidden");
+ index=0;
+ openSurah(currentSurah,false);
+}
+function continueFromCurrent(){
+ modal.classList.add("hidden");
+ openSurah(currentSurah,true);
+}
+</script>
+
+</body>
+</html>
