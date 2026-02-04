@@ -1,8 +1,10 @@
 {
+  "id": "holy-quran-pwa",
   "name": "Holy Quran",
   "short_name": "Quran",
   "description": "Holy Quran with beautiful recitation from world famous Qaris. Read Arabic Quran with Urdu translation and smooth audio playback.",
-  "start_url": "./index.html",
+  "start_url": ".",
+  "scope": ".",
   "display": "standalone",
   "background_color": "#020617",
   "theme_color": "#064e3b",
@@ -11,12 +13,14 @@
     {
       "src": "icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
